@@ -8,62 +8,57 @@ class CurrencyConverterBloc
   final ConvertCurrencyUseCase convertCurrencyUseCase;
 
   CurrencyConverterBloc(this.convertCurrencyUseCase)
-      : super(const CurrencyConverterInitial()) {
+      : super(const CurrencyConverterState()) {
     on<ConvertCurrencyEvent>(_onConvertCurrency);
     on<SwapCurrenciesEvent>(_onSwapCurrencies);
   }
 
   Future<void> _onConvertCurrency(
-    ConvertCurrencyEvent event,
-    Emitter<CurrencyConverterState> emit,
-  ) async {
-    emit(CurrencyConverterLoading(
+      ConvertCurrencyEvent event,
+      Emitter<CurrencyConverterState> emit,
+      ) async {
+    emit(state.copyWith(
+      status: CurrencyStatus.loading,
       fromCurrency: event.fromCurrency,
       toCurrency: event.toCurrency,
       amount: event.amount,
     ));
 
     try {
+      // 🔹 Delayed result (UX + debounce simulation)
+      await Future.delayed(const Duration(milliseconds: 400));
+
       final exchangeRate = await convertCurrencyUseCase(
         fromCurrency: event.fromCurrency,
         toCurrency: event.toCurrency,
         amount: event.amount,
       );
 
-      emit(CurrencyConverterLoaded(
+      emit(state.copyWith(
+        status: CurrencyStatus.loaded,
         exchangeRate: exchangeRate,
-        fromCurrency: event.fromCurrency,
-        toCurrency: event.toCurrency,
-        amount: event.amount,
       ));
     } catch (e) {
-      emit(CurrencyConverterError(
-        message: e.toString(),
-        fromCurrency: event.fromCurrency,
-        toCurrency: event.toCurrency,
-        amount: event.amount,
+      emit(state.copyWith(
+        status: CurrencyStatus.error,
+        errorMessage: e.toString(),
       ));
     }
   }
 
   void _onSwapCurrencies(
-    SwapCurrenciesEvent event,
-    Emitter<CurrencyConverterState> emit,
-  ) {
-    final currentState = state;
-    if (currentState is CurrencyConverterInitial ||
-        currentState is CurrencyConverterLoaded ||
-        currentState is CurrencyConverterError) {
-      final fromCurrency = currentState.toCurrency;
-      final toCurrency = currentState.fromCurrency;
-      final amount = currentState.amount;
+      SwapCurrenciesEvent event,
+      Emitter<CurrencyConverterState> emit,
+      ) {
+    emit(state.copyWith(
+      fromCurrency: state.toCurrency,
+      toCurrency: state.fromCurrency,
+    ));
 
-      add(ConvertCurrencyEvent(
-        fromCurrency: fromCurrency,
-        toCurrency: toCurrency,
-        amount: amount,
-      ));
-    }
+    add(ConvertCurrencyEvent(
+      fromCurrency: state.toCurrency,
+      toCurrency: state.fromCurrency,
+      amount: state.amount,
+    ));
   }
 }
-
